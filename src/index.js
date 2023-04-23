@@ -1,6 +1,6 @@
 require("dotenv").config();
 const helmet = require("helmet");
-const morgan = require("morgan");
+// const morgan = require("morgan");
 const express = require("express");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
@@ -21,7 +21,7 @@ app.use(
 );
 
 app.use(helmet());
-app.use(morgan("common")); // remove before deploying
+// app.use(morgan("common")); // remove before deploying
 
 // Connect to MySQL
 const pool = mysql.createPool({
