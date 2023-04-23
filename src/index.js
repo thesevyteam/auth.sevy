@@ -9,6 +9,7 @@ const authRoutes = require("./v1/routes/auth.route");
 
 const app = express();
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.set("trust proxy", 1);
 app.use(cookieParser(process.env.COOKIE_SECRET));
 app.use(

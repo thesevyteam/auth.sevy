@@ -1,0 +1,41 @@
+CREATE TABLE users (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  uid VARCHAR(100) NOT NULL,
+  first_name VARCHAR(100) NOT NULL,
+  last_name VARCHAR(100) NOT NULL,
+  email VARCHAR(100) NOT NULL UNIQUE,
+  password VARCHAR(255) NOT NULL,
+  phone VARCHAR(20) NOT NULL,
+  role ENUM('handyman', 'customer') NOT NULL DEFAULT 'customer',
+  status ENUM('active', 'inactive', 'banned', 'incomplete') NOT NULL DEFAULT 'active',
+  profile_picture VARCHAR(255),
+  geohash4 VARCHAR(4),
+  geohash5 VARCHAR(5),
+  geohash6 VARCHAR(6),
+  city VARCHAR(255),
+  primary_contact ENUM('email', 'phone') NOT NULL DEFAULT 'email',
+  id_type VARCHAR(255),
+  id_num VARCHAR(255),
+  id_card VARCHAR(255),
+  otp INT,
+  otp_expires_at TIMESTAMP,
+  is_verified BOOLEAN NOT NULL DEFAULT FALSE,
+  contact_verified BOOLEAN NOT NULL DEFAULT FALSE,
+  bio TEXT,
+  yoe VARCHAR(10) DEFAULT '0',
+  available_days
+  SET
+    (
+      'monday',
+      'tuesday',
+      'wednesday',
+      'thursday',
+      'friday',
+      'saturday',
+      'sunday'
+    ),
+    available_start_time INT,
+    available_end_time INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);

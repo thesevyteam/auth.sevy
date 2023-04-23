@@ -6,6 +6,7 @@ const router = express.Router();
 const { v4: uuidv4 } = require("uuid");
 const { generateOTP, sendOTPViaEmail, sendOTPViaSMS } = require("../utils/otp");
 const { authenticateJWT } = require("../middlewares");
+const { uploadID, uploadProfilePicture, multerUpload } = require("../services");
 
 // Registration route
 router.post(
@@ -30,7 +31,7 @@ router.post(
       primary_contact,
       role,
       status,
-      profile_picture,
+      profile_picture = "https://res.cloudinary.com/kennydop/image/upload/v1682186354/sevy/profile_pictures/profile-pic_6_gqeh9w.png",
       geohash4 = "",
       geohash5 = "",
       geohash6 = "",
@@ -69,6 +70,24 @@ router.post(
         await sendOTPViaSMS(phone, otp);
       }
 
+      const token = jwt.sign(
+        {
+          uid,
+          first_name,
+          last_name,
+          email,
+          phone,
+          role,
+          status,
+          profile_picture,
+          primary_contact,
+        },
+        process.env.JWT_SECRET,
+        {
+          expiresIn: process.env.ACCESS_TOKEN_EXPIRY || "1h",
+        }
+      );
+
       res.cookie("token", token, { httpOnly: true, sameSite: "strict" });
       res.status(201).json({
         message:
@@ -106,28 +125,24 @@ router.post("/signin", async (req, res) => {
     return res.status(401).json({ error: "Invalid email or password" });
   }
 
-  const token = jwt.sign(
-    { uid: result[0].uid, email: result[0].email },
-    process.env.JWT_SECRET,
-    {
-      expiresIn: "1h",
-    }
-  );
+  const _user = {
+    uid: result[0].uid,
+    email: result[0].email,
+    first_name: result[0].first_name,
+    last_name: result[0].last_name,
+    phone: result[0].phone,
+    role: result[0].role,
+    status: result[0].status,
+    profile_picture: result[0].profile_picture,
+    primary_contact: result[0].primary_contact,
+  };
+
+  const token = jwt.sign(_user, process.env.JWT_SECRET, {
+    expiresIn: process.env.ACCESS_TOKEN_EXPIRY || "1h",
+  });
 
   res.cookie("token", token, { httpOnly: true, sameSite: "strict" });
-  res.json({
-    data: {
-      uid: result[0].uid,
-      first_name: result[0].first_name,
-      last_name: result[0].last_name,
-      email: result[0].email,
-      phone: result[0].phone,
-      role: result[0].role,
-      status: result[0].status,
-      profile_picture: result[0].profile_picture,
-      primary_contact: result[0].primary_contact,
-    },
-  });
+  res.json({ data: _user });
 });
 
 router.post("/verify-otp", async (req, res) => {
@@ -190,6 +205,45 @@ router.post("/resend-otp", async (req, res) => {
   }
 });
 
+router.post("/set-handyman-profile", authenticateJWT, async (req, res) => {
+  const {
+    yoe,
+    bio,
+    availableDays,
+    available_start_time,
+    available_end_time,
+    geohash,
+    city,
+  } = req.body;
+  var available_days = "";
+  availableDays.forEach((day) => {
+    available_days += day + ",";
+  });
+  available_days = available_days.substring(0, available_days.length - 1);
+  const uid = req.user.uid;
+  try {
+    req.db.query(
+      "UPDATE users SET yoe = ?, bio = ?, available_days = ?, available_start_time = ?, available_end_time = ?, geohash4 = ?, geohash5 = ?, geohash6 = ?, city = ? WHERE uid = ?",
+      [
+        yoe,
+        bio,
+        available_days,
+        available_start_time,
+        available_end_time,
+        geohash.substring(0, 4),
+        geohash.substring(0, 5),
+        geohash.substring(0, 6),
+        city,
+        uid,
+      ]
+    );
+    res.json({ message: "Handyman profile set successfully" });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 async function storeOTP(req, otp, uid) {
   await req.db.query(
     "UPDATE users SET otp = ?, otp_expires_at = ? WHERE uid = ?",
@@ -200,18 +254,66 @@ async function storeOTP(req, otp, uid) {
 router.post("/refresh", authenticateJWT, (req, res) => {
   const user = req.user;
 
-  // Generate a new access token
-  const newAccessToken = jwt.sign(
-    { email: user.email, id: user.uid },
-    process.env.ACCESS_TOKEN_SECRET,
-    {
-      expiresIn: process.env.ACCESS_TOKEN_EXPIRY || "1h",
-    }
-  );
+  const _user = {
+    uid: user.uid,
+    email: user.email,
+    first_name: user.first_name,
+    last_name: user.last_name,
+    phone: user.phone,
+    role: user.role,
+    status: user.status,
+    profile_picture: user.profile_picture,
+    primary_contact: user.primary_contact,
+  };
 
+  // Generate a new access token
+  const newAccessToken = jwt.sign(_user, process.env.JWT_SECRET, {
+    expiresIn: process.env.ACCESS_TOKEN_EXPIRY || "1h",
+  });
+  console.log(user);
   // Set the new access token as an HttpOnly cookie
   res.cookie("token", newAccessToken, { httpOnly: true, sameSite: "strict" });
-  res.status(200).json({ message: "Token refreshed successfully" });
+  res.status(200).json({ data: _user });
+});
+
+router.post("/upload-id", authenticateJWT, multerUpload, async (req, res) => {
+  try {
+    const idFile = req.files.id[0];
+    const profilePictureFile = req.files.profile_picture[0];
+    console.log(req.body);
+    const idType = req.body.id_type;
+    const idNum = req.body.id_number;
+
+    // Save the ID card, profile picture, and ID details in the database
+    const updateQuery = `
+        UPDATE users
+        SET id_type = ?, id_num = ?, id_card = ?, profile_picture = ?
+        WHERE uid = ?;
+      `;
+
+    await req.db.query(updateQuery, [
+      idType,
+      idNum,
+      idFile.path,
+      profilePictureFile.path,
+      req.user.uid,
+    ]);
+
+    res.json({
+      success: true,
+      message: "Handyman information uploaded successfully",
+      data: {
+        profile_picture: profilePictureFile.path,
+      },
+    });
+  } catch (error) {
+    console.error("Error uploading handyman information:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error uploading handyman information",
+      error: error.message,
+    });
+  }
 });
 
 // Protected route example
