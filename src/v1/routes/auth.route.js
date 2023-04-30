@@ -31,7 +31,7 @@ router.post(
       primary_contact,
       role,
       status,
-      profile_picture = "https://res.cloudinary.com/kennydop/image/upload/v1682186354/sevy/profile_pictures/profile-pic_6_gqeh9w.png",
+      profile_picture = `https://ui-avatars.com/api/?name=${first_name}+${last_name}&background=ffff&size=128&color=40916C`,
       geohash4 = "",
       geohash5 = "",
       geohash6 = "",
@@ -84,7 +84,7 @@ router.post(
         },
         process.env.JWT_SECRET,
         {
-          expiresIn: process.env.ACCESS_TOKEN_EXPIRY || "1h",
+          expiresIn: process.env.ACCESS_TOKEN_EXPIRY || "24h",
         }
       );
 
@@ -138,7 +138,7 @@ router.post("/signin", async (req, res) => {
   };
 
   const token = jwt.sign(_user, process.env.JWT_SECRET, {
-    expiresIn: process.env.ACCESS_TOKEN_EXPIRY || "1h",
+    expiresIn: process.env.ACCESS_TOKEN_EXPIRY || "24h",
   });
 
   res.cookie("token", token, { httpOnly: true, sameSite: "strict" });
@@ -268,7 +268,7 @@ router.post("/refresh", authenticateJWT, (req, res) => {
 
   // Generate a new access token
   const newAccessToken = jwt.sign(_user, process.env.JWT_SECRET, {
-    expiresIn: process.env.ACCESS_TOKEN_EXPIRY || "1h",
+    expiresIn: process.env.ACCESS_TOKEN_EXPIRY || "24h",
   });
   console.log(user);
   // Set the new access token as an HttpOnly cookie
@@ -311,6 +311,46 @@ router.post("/upload-id", authenticateJWT, multerUpload, async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Error uploading handyman information",
+      error: error.message,
+    });
+  }
+});
+
+router.get("/users/:uid", async (req, res) => {
+  try {
+    const uid = req.params.uid;
+    const [rows] = await req.db.query("SELECT * FROM users WHERE uid = ?", [
+      uid,
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        uid: rows[0].uid,
+        email: rows[0].email,
+        first_name: rows[0].first_name,
+        last_name: rows[0].last_name,
+        phone: rows[0].phone,
+        role: rows[0].role,
+        status: rows[0].status,
+        profile_picture: rows[0].profile_picture,
+        primary_contact: rows[0].primary_contact,
+        yoe: rows[0].yoe,
+        geohash6: rows[0].geohash6,
+        geohash5: rows[0].geohash5,
+        geohash4: rows[0].geohash4,
+        city: rows[0].city,
+        bio: rows[0].bio,
+        available_days: rows[0].available_days,
+        available_start_time: rows[0].available_start_time,
+        available_end_time: rows[0].available_end_time,
+      },
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching user",
       error: error.message,
     });
   }
